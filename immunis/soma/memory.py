@@ -1,38 +1,32 @@
-"""Quarantined memory store for SOMA. Write-through to disk on every write."""
-import json, os, uuid
-from immunis.contracts.models import MemoryEntry, MemoryDiff, TaintTag
+from __future__ import annotations
+import json
+from pathlib import Path
+from immunis.contracts.models import TaintTag
 
-DEFAULT_MEMORY_PATH = "memory.json"   # single default, one place
-
+DEFAULT_MEMORY_PATH = "runs/memory.json"
 
 class MemoryStore:
     def __init__(self, path: str = DEFAULT_MEMORY_PATH):
-        self.path = path
-        self.entries: dict[str, MemoryEntry] = {}
-        if os.path.exists(path):
-            with open(path) as f:
-                for raw in json.load(f):
-                    e = MemoryEntry(**raw)
-                    self.entries[e.id] = e
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.entries: dict[str, dict] = {}
+        if self.path.exists():
+            self.entries = json.loads(self.path.read_text() or "{}")
 
-    def write(self, text: str, tag: TaintTag, quarantined: bool = False) -> MemoryEntry:
-        # NOTE: quarantine is a POLICY decision, not a taint default (see B).
-        entry = MemoryEntry(id=f"mem_{uuid.uuid4().hex[:8]}", text=text,
-                            tag=tag, quarantined=quarantined)
-        self.entries[entry.id] = entry
-        self._flush()
-        return entry
+    def snapshot(self) -> dict:
+        return json.loads(json.dumps(self.entries))
 
-    def snapshot(self) -> list[MemoryEntry]:
-        return list(self.entries.values())
+    def diff(self, before: dict) -> dict:
+        return {"added": [k for k in self.entries if k not in before]}
 
-    def diff(self, before: list[MemoryEntry]) -> MemoryDiff:
-        after = self.snapshot()
-        before_q = {e.id for e in before if e.quarantined}
-        return MemoryDiff(before=before, after=after,
-                          quarantine_changes=[e.id for e in after
-                                              if e.quarantined and e.id not in before_q])
+    def write(self, content: str, taint: TaintTag, quarantined: bool = False) -> dict:
+        entry_id = f"mem_{len(self.entries) + 1:04d}"
+        self.entries[entry_id] = {"content": content, "taint": taint.model_dump(),
+                                  "quarantined": quarantined}
+        self.path.write_text(json.dumps(self.entries, indent=2))
+        return {"id": entry_id, **self.entries[entry_id]}
 
-    def _flush(self):
-        with open(self.path, "w") as f:
-            json.dump([e.model_dump() for e in self.entries.values()], f, indent=2)
+    def search(self, query: str) -> dict:
+        hits = [{"id": k, "content": v["content"], "taint": v["taint"]}
+                for k, v in self.entries.items() if query.lower() in v["content"].lower()]
+        return {"output": json.dumps(hits), "hits": hits}

@@ -5,3 +5,11 @@ __pycache__/
 runs/
 soma/state/
 *.db
+.env
+runs/
+__pycache__/
+*.pyc
+.env
+runs/
+__pycache__/
+*.pyc
