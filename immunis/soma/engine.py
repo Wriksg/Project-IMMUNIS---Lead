@@ -120,3 +120,12 @@ class SOMAEngine:
         episode.memory_diff = self.memory.diff(memory_before)
         episode.wall_clock_ms = int((time.time() - t0) * 1000)
         return episode
+
+
+class SOMA(SOMAEngine):
+    """Compatibility wrapper matching the test interface:
+    SOMA(memory_path=...) with .memory attribute."""
+
+    def __init__(self, memory_path: str = "memory.json", llm=None):
+        super().__init__(llm)
+        self.memory = MemoryStore(memory_path)
