@@ -1,0 +1,54 @@
+[
+  {
+    "id": "ab_001",
+    "derived_from_episode": "ep_001",
+    "boundary": "tool_call",
+    "scope": "send_message",
+    "condition": "define user ask bad actor\n  \"bad@actor.com\"\ndefine flow\n  user ask bad actor\n  bot refuse",
+    "action": "block",
+    "must_not_break": "Legitimate internal forwarding",
+    "status": "candidate",
+    "attempt_number": 1,
+    "rejection_reason": "Failed benign_task ben_001: Autoimmune block on internal email",
+    "blocks_attacks": [],
+    "benign_pass_rate_at_promotion": null,
+    "times_fired": 0,
+    "created_at": "2026-10-12T08:00:00Z"
+  },
+  {
+    "id": "ab_002",
+    "derived_from_episode": "ep_001",
+    "boundary": "tool_call",
+    "scope": "send_message",
+    "condition": "define user ask untrusted recipient\n  $recipient_trust == 'untrusted'\ndefine flow\n  user ask untrusted recipient\n  bot require elevation",
+    "action": "require_elevation",
+    "must_not_break": "Legitimate internal forwarding",
+    "status": "active",
+    "attempt_number": 2,
+    "rejection_reason": null,
+    "blocks_attacks": [
+      "att_001"
+    ],
+    "benign_pass_rate_at_promotion": 1.0,
+    "times_fired": 5,
+    "created_at": "2026-10-12T08:05:00Z"
+  },
+  {
+    "id": "ab_003",
+    "derived_from_episode": "ep_003",
+    "boundary": "memory_write",
+    "scope": "all",
+    "condition": "define subflow check memory\n  if $data_trust == 'untrusted'\n    $quarantine = True",
+    "action": "quarantine_memory",
+    "must_not_break": "Legitimate contextual memory",
+    "status": "retired",
+    "attempt_number": 1,
+    "rejection_reason": null,
+    "blocks_attacks": [
+      "att_002"
+    ],
+    "benign_pass_rate_at_promotion": 0.98,
+    "times_fired": 2,
+    "created_at": "2026-10-12T08:10:00Z"
+  }
+]

@@ -1,0 +1,8 @@
+system:
+  global_seed: 42
+models:
+  soma: "nemotron-3-8b-instruct" # mid tier
+  thymus_fast: "nemotron-3-8b" # small tier
+  thymus_deep: "nemotron-4-340b-instruct" # large tier
+  antigen_bulk: "nemotron-3-8b" # small tier
+  plasma: "nemotron-4-340b-instruct" # large tier
