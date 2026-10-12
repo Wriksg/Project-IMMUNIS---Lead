@@ -1,10 +1,12 @@
-"""Quarantined memory store for SOMA."""
+"""Quarantined memory store for SOMA. Write-through to disk on every write."""
 import json, os, uuid
-from immunis.contracts.models import MemoryEntry, MemoryDiff, TaintTag, Trust
+from immunis.contracts.models import MemoryEntry, MemoryDiff, TaintTag
+
+DEFAULT_MEMORY_PATH = "memory.json"   # single default, one place
 
 
 class MemoryStore:
-    def __init__(self, path: str = "memory.json"):
+    def __init__(self, path: str = DEFAULT_MEMORY_PATH):
         self.path = path
         self.entries: dict[str, MemoryEntry] = {}
         if os.path.exists(path):
@@ -13,12 +15,10 @@ class MemoryStore:
                     e = MemoryEntry(**raw)
                     self.entries[e.id] = e
 
-    def write(self, text: str, tag: TaintTag) -> MemoryEntry:
-        entry = MemoryEntry(
-            id=f"mem_{uuid.uuid4().hex[:8]}",
-            text=text, tag=tag,
-            quarantined=(tag.trust == Trust.untrusted),
-        )
+    def write(self, text: str, tag: TaintTag, quarantined: bool = False) -> MemoryEntry:
+        # NOTE: quarantine is a POLICY decision, not a taint default (see B).
+        entry = MemoryEntry(id=f"mem_{uuid.uuid4().hex[:8]}", text=text,
+                            tag=tag, quarantined=quarantined)
         self.entries[entry.id] = entry
         self._flush()
         return entry
@@ -28,9 +28,10 @@ class MemoryStore:
 
     def diff(self, before: list[MemoryEntry]) -> MemoryDiff:
         after = self.snapshot()
-        before_quar = {e.id for e in before if e.quarantined}
-        quar_changes = [e.id for e in after if e.quarantined and e.id not in before_quar]
-        return MemoryDiff(before=before, after=after, quarantine_changes=quar_changes)
+        before_q = {e.id for e in before if e.quarantined}
+        return MemoryDiff(before=before, after=after,
+                          quarantine_changes=[e.id for e in after
+                                              if e.quarantined and e.id not in before_q])
 
     def _flush(self):
         with open(self.path, "w") as f:
