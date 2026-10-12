@@ -39,8 +39,20 @@ def memory_write(content: str) -> dict:
     from immunis.soma.memory import MemoryStore
     from immunis.soma.taint import stamp
     from immunis.contracts.models import Trust, Origin
-    entry = MemoryStore().write(content, stamp("tool_write", Trust.trusted, Origin.soma_summary))
+    entry = MemoryStore().write(content, stamp("tool_write", Trust.trusted, Origin.tool))
     return {"output": f"stored {entry['id']}", "id": entry["id"]}
 
 def send_message(to: str, body: str) -> dict:
     return {"output": f"sent to {to}", "id": f"out_{to}"}
+
+
+TOOLS = {
+    "read_inbox": read_inbox,
+    "read_email": read_email,
+    "fetch_page": fetch_page,
+    "read_file": read_file,
+    "write_file": write_file,
+    "memory_search": memory_search,
+    "memory_write": memory_write,
+    "send_message": send_message,
+}

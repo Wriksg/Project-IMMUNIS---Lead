@@ -1,1 +1,5 @@
-soma: "meta/llama-3.1-70b-instruct"
+soma: "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+thymus_fast: "nvidia/nemotron-3-super-120b-a12b"
+thymus_deep: "nvidia/nemotron-3-super-120b-a12b"
+plasma: "nvidia/nemotron-3-super-120b-a12b"
+antigen_bulk: "nvidia/nemotron-3-super-120b-a12b"

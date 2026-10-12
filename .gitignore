@@ -13,3 +13,11 @@ __pycache__/
 runs/
 __pycache__/
 *.pyc
+.env
+runs/
+__pycache__/
+*.pyc
+.env
+runs/
+__pycache__/
+*.pyc
