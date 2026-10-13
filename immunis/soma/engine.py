@@ -7,7 +7,7 @@ from immunis.contracts.models import (Episode, ToolCall, MemoryEntry,
                                       MemoryDiff, TaintTag, Trust, Origin)
 from immunis.soma.taint import stamp, derive
 from immunis.soma.memory import MemoryStore
-from immunis.soma.policy import POLICY_VERSION
+from immunis.soma.policy import POLICY_VERSION, evaluate_tool_call
 from immunis.soma.tools import TOOLS
 
 FETCH_TOOLS = frozenset({"read_inbox", "read_email", "fetch_page",
@@ -117,16 +117,29 @@ class SOMA:
                     arg_tag = derive(ctx, None, f"arg:{name}")
                 else:
                     arg_tag = stamp(f"arg:{name}", Trust.trusted, Origin.user)
+                taint_trace = {k: arg_tag.model_copy(deep=True)
+                               for k in args}
+                permitted, blocked_by, block_reason = evaluate_tool_call(
+                    type("Probe", (), {"name": name,
+                                       "taint_trace": taint_trace})()
+                )
                 tc = ToolCall(name=name, arguments=args,
-                              taint_trace={k: arg_tag.model_copy(deep=True)
-                                           for k in args},
-                              permitted=True, blocking_antibody_id=None)
+                              taint_trace=taint_trace,
+                              permitted=permitted,
+                              blocking_antibody_id=blocked_by)
                 tool_calls.append(tc)
                 transcript.append({"role": "tool_call", "name": name,
                                    "arguments": args,
                                    "taint": arg_tag.model_dump(),
-                                   "permitted": True})
+                                   "permitted": permitted,
+                                   "blocked_by": blocked_by,
+                                   "block_reason": block_reason})
                 fn = _REGISTRY.get(name)
+                if not permitted:
+                    out = f"BLOCKED by antibody {blocked_by}: {block_reason}"
+                    transcript.append({"role": "tool_result", "name": name,
+                                       "output": out, "blocked": True})
+                    continue
                 out = ""
                 if fn is not None:
                     try:
