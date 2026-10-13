@@ -75,8 +75,16 @@ class SOMA:
             calls = resp.get("tool_calls") or []
             if not calls:
                 break
+            # Assistant turn announcing its tool calls (API contract).
+            messages.append({"role": "assistant", "tool_calls": [
+                {"id": c.get("id") or f"call_{i}",
+                 "type": "function",
+                 "function": {"name": c["name"],
+                              "arguments": json.dumps(c["arguments"])}}
+                for i, c in enumerate(calls)]})
             for call in calls:
                 name, args = call["name"], call["arguments"]
+                call_id = call.get("id") or f"call_{calls.index(call)}"
                 ctx = self._context_tags(accumulated)
                 if ctx:
                     arg_tag = derive(ctx, None, f"arg:{name}")
@@ -105,7 +113,9 @@ class SOMA:
                 result_tag = self._tool_result_tag(name)
                 # The agent now OBSERVES this result -> taint accumulates.
                 accumulated.append(result_tag)
-                messages.append({"role": "tool", "name": name,
+                messages.append({"role": "tool",
+                                 "tool_call_id": call_id,
+                                 "name": name,
                                  "content": out})
                 transcript.append({"role": "tool_result", "name": name,
                                    "taint": result_tag.model_dump()})
@@ -127,5 +137,5 @@ class SOMA:
             memory_diff=MemoryDiff(before=before_models, after=after_models,
                                    quarantine_changes=quarantine_changes),
             wall_clock_ms=int((time.time() - t0) * 1000),
-            token_count=0,
+            token_count=getattr(self.llm, "last_usage", 0),
             fixture_set_id="default")
