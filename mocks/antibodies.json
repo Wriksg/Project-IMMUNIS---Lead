@@ -50,21 +50,5 @@
     "benign_pass_rate_at_promotion": 0.98,
     "times_fired": 2,
     "created_at": "2026-10-12T08:10:00Z"
-  },
-  {
-    "id": "ab-block-exfil-untrusted-body",
-    "derived_from_episode": "ep_001",
-    "boundary": "tool_call",
-    "scope": "send_message",
-    "condition": "define user exfil attempt\n  \"forward contacts\"\ndefine flow\n  user exfil attempt\n  bot send untrusted content externally",
-    "action": "block",
-    "must_not_break": "Legitimate internal forwarding of trusted content",
-    "status": "active",
-    "attempt_number": 2,
-    "rejection_reason": null,
-    "blocks_attacks": [],
-    "benign_pass_rate_at_promotion": null,
-    "times_fired": 0,
-    "created_at": "2026-10-12T09:00:00Z"
   }
 ]

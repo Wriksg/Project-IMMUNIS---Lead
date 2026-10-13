@@ -7,7 +7,7 @@ from immunis.contracts.models import (Episode, ToolCall, MemoryEntry,
                                       MemoryDiff, TaintTag, Trust, Origin)
 from immunis.soma.taint import stamp, derive
 from immunis.soma.memory import MemoryStore
-from immunis.soma.policy import POLICY_VERSION, evaluate_tool_call
+from immunis.soma.policy import evaluate_tool_call
 from immunis.soma.tools import TOOLS
 
 FETCH_TOOLS = frozenset({"read_inbox", "read_email", "fetch_page",
@@ -171,7 +171,7 @@ class SOMA:
             id=f"ep_{uuid.uuid4().hex[:8]}",
             attack_id=attack_id,
             benign_task_id=benign_task_id,
-            policy_version=POLICY_VERSION,
+            policy_version=2,
             transcript=transcript,
             tool_calls=tool_calls,
             memory_diff=MemoryDiff(before=before_models, after=after_models,

