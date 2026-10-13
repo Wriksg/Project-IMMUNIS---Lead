@@ -11,8 +11,11 @@ def main() -> None:
     args = ap.parse_args()
     soma = SOMA(memory_path=args.memory, llm=LLMClient("soma"))
     ep = soma.run(args.task)
+    answer = next((m["content"] for m in reversed(ep.transcript)
+                   if m["role"] == "assistant" and m.get("content")),
+                  "(no assistant content)")
     print("=== ANSWER ===")
-    print(ep.content)
+    print(answer)
     print("=== TOOL CALLS ===")
     for tc in ep.tool_calls:
         trusts = {t.trust.value for t in tc.taint_trace.values()}
