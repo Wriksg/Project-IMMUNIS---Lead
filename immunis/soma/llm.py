@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from openai import OpenAI
+from openai import OpenAI, InternalServerError, RateLimitError
 
 _ROLES = ("soma", "thymus_fast", "thymus_deep", "plasma", "antigen_bulk")
 
@@ -46,9 +46,10 @@ class LLMClient:
             api_key=key,
             base_url="https://integrate.api.nvidia.com/v1")
 
-    def chat(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    def chat(self, messages: list[dict[str, Any]],
+             tools: list[dict] | None = None) -> dict[str, Any]:
         t0 = time.perf_counter()
-        response = self._raw_chat(messages)
+        response = self._raw_chat(messages, tools)
         self.last_wall_ms = int((time.perf_counter() - t0) * 1000)
         usage = response.get("usage")
         self.last_usage = usage.get("total_tokens", 0) if usage else 0
@@ -68,12 +69,23 @@ class LLMClient:
         return {"content": content if content is not None else "",
                 "tool_calls": tool_calls}
 
-    def _raw_chat(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
-        return self._client.chat.completions.create(
-            model=self.model,
-            messages=messages,  # type: ignore[arg-type]
-            max_tokens=self.max_tokens,
-        ).model_dump()
+    def _raw_chat(self, messages: list[dict[str, Any]],
+                  tools: list[dict] | None = None) -> dict[str, Any]:
+        kwargs: dict = dict(model=self.model, messages=messages,
+                            max_tokens=self.max_tokens)
+        if tools:
+            kwargs["tools"] = tools
+            kwargs["tool_choice"] = "auto"
+        delay = 2.0
+        for attempt in range(4):
+            try:
+                return self._client.chat.completions.create(**kwargs).model_dump()
+            except (InternalServerError, RateLimitError):
+                if attempt == 3:
+                    raise
+                time.sleep(delay)
+                delay *= 2
+        raise AssertionError("unreachable")
 
 
 class ScriptedLLM:
@@ -84,7 +96,8 @@ class ScriptedLLM:
         self.i = 0
         self.sent: list[list[dict[str, Any]]] = []
 
-    def chat(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    def chat(self, messages: list[dict[str, Any]],
+             tools: list[dict] | None = None) -> dict[str, Any]:
         self.sent.append(list(messages))
         turn = self.script[self.i] if self.i < len(self.script) else "done"
         self.i += 1

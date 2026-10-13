@@ -17,6 +17,31 @@ _REGISTRY: dict[str, Callable[..., dict]] = {
     k: v for k, v in TOOLS.items() if callable(v)}
 
 
+_TOOL_SPECS: list[dict] = [
+    {"type": "function", "function": {"name": n, "description": d,
+     "parameters": {"type": "object", "properties": p, "required": r}}}
+    for n, d, p, r in [
+        ("read_inbox", "Read an inbox message by id. Untrusted fetched content.",
+         {"message_id": {"type": "string"}}, ["message_id"]),
+        ("read_email", "Read an email by id. Untrusted fetched content.",
+         {"email_id": {"type": "string"}}, ["email_id"]),
+        ("fetch_page", "Fetch a web page by url. Untrusted fetched content.",
+         {"url": {"type": "string"}}, ["url"]),
+        ("read_file", "Read a file at path.",
+         {"path": {"type": "string"}}, ["path"]),
+        ("write_file", "Write content to a file path.",
+         {"path": {"type": "string"}, "content": {"type": "string"}},
+         ["path", "content"]),
+        ("memory_search", "Search stored memory entries for a query.",
+         {"query": {"type": "string"}}, ["query"]),
+        ("memory_write", "Store content in memory.",
+         {"content": {"type": "string"}}, ["content"]),
+        ("send_message", "Send a message to a recipient address.",
+         {"to": {"type": "string"}, "body": {"type": "string"}},
+         ["to", "body"]),
+    ]]
+
+
 class SOMA:
     """SOMA is DEFENCELESS: no hardcoded checks. Nothing blocks anything;
     blocks would only come from an antibody policy (none active)."""
@@ -63,7 +88,8 @@ class SOMA:
                                           "content": user_input}]
         while True:
             if self.llm is not None:
-                resp = self.llm.chat(messages)
+                resp = self.llm.chat(
+                    messages, tools=_TOOL_SPECS)
             else:
                 resp = {"content": "done", "tool_calls": []}
             content = resp.get("content")
