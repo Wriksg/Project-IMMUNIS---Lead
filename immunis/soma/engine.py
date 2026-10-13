@@ -25,21 +25,22 @@ class SOMA:
         self.llm = llm
         self.memory = MemoryStore(memory_path)
 
+    def recall_tag(self, entry_id: str) -> TaintTag:
+        """Memory reads inherit the stored entry's tag; the read action
+        itself is tagged Origin.memory."""
+        stored = self.memory.read(entry_id)
+        return derive([stored.tag], Origin.memory, f"recall:{entry_id}")
+
     def _context_tags(self, accumulated: list[TaintTag]) -> list[TaintTag]:
         tags = list(accumulated)
-        for v in self.memory.entries.values():
-            tags.append(TaintTag.model_validate(v["taint"]))
+        for entry in self.memory.entries.values():
+            tags.append(self.recall_tag(entry.id))
         return tags
 
     def _tool_result_tag(self, name: str) -> TaintTag:
         if name in FETCH_TOOLS:
             return stamp(f"tool:{name}", Trust.untrusted, Origin.fetched_content)
         return stamp(f"tool:{name}", Trust.trusted, Origin.tool)
-
-    def _entry_to_model(self, entry_id: str, v: dict) -> MemoryEntry:
-        return MemoryEntry(id=entry_id, text=v["content"],
-                           tag=TaintTag.model_validate(v["taint"]),
-                           quarantined=bool(v["quarantined"]))
 
     def run(self, user_input: str, attack_id: str | None = None,
             benign_task_id: str | None = None) -> Episode:
@@ -110,12 +111,12 @@ class SOMA:
                                    "taint": result_tag.model_dump()})
 
         after = dict(self.memory.entries)
-        before_models = [self._entry_to_model(k, v) for k, v in before.items()]
-        after_models = [self._entry_to_model(k, v) for k, v in after.items()]
-        quarantine_changes = [k for k, v in after.items()
-                              if v["quarantined"]
-                              and (k not in before
-                                   or not before[k]["quarantined"])]
+        before_models = list(before.values())
+        after_models = list(after.values())
+        quarantine_changes = [e.id for e in after.values()
+                              if e.quarantined
+                              and (e.id not in before
+                                   or not before[e.id].quarantined)]
         return Episode(
             id=f"ep_{uuid.uuid4().hex[:8]}",
             attack_id=attack_id,
