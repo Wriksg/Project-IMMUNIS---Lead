@@ -1,32 +1,35 @@
-from __future__ import annotations
+"""Persistent memory. Stores and reloads contract MemoryEntry models."""
 import json
 from pathlib import Path
-from immunis.contracts.models import TaintTag
 
-DEFAULT_MEMORY_PATH = "runs/memory.json"
+from immunis.contracts.models import MemoryEntry, TaintTag
+
 
 class MemoryStore:
-    def __init__(self, path: str = DEFAULT_MEMORY_PATH):
+    def __init__(self, path: str = "memory.json"):
         self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.entries: dict[str, dict] = {}
+        self.entries: dict[str, MemoryEntry] = {}
         if self.path.exists():
-            self.entries = json.loads(self.path.read_text() or "{}")
+            raw = json.loads(self.path.read_text() or "{}")
+            self.entries = {
+                k: MemoryEntry.model_validate(v) for k, v in raw.items()
+            }
 
-    def snapshot(self) -> dict:
-        return json.loads(json.dumps(self.entries))
-
-    def diff(self, before: dict) -> dict:
-        return {"added": [k for k in self.entries if k not in before]}
-
-    def write(self, content: str, taint: TaintTag, quarantined: bool = False) -> dict:
+    def write(self, content: str, taint: TaintTag,
+              quarantined: bool = False) -> MemoryEntry:
         entry_id = f"mem_{len(self.entries) + 1:04d}"
-        self.entries[entry_id] = {"content": content, "taint": taint.model_dump(),
-                                  "quarantined": quarantined}
-        self.path.write_text(json.dumps(self.entries, indent=2))
-        return {"id": entry_id, **self.entries[entry_id]}
+        entry = MemoryEntry(id=entry_id, text=content,
+                            tag=taint, quarantined=quarantined)
+        self.entries[entry_id] = entry
+        self._persist()
+        return entry
 
-    def search(self, query: str) -> dict:
-        hits = [{"id": k, "content": v["content"], "taint": v["taint"]}
-                for k, v in self.entries.items() if query.lower() in v["content"].lower()]
-        return {"output": json.dumps(hits), "hits": hits}
+    def read(self, entry_id: str) -> MemoryEntry:
+        return self.entries[entry_id]
+
+    def all_entries(self) -> list[MemoryEntry]:
+        return list(self.entries.values())
+
+    def _persist(self) -> None:
+        self.path.write_text(json.dumps(
+            {k: v.model_dump() for k, v in self.entries.items()}, indent=2))
