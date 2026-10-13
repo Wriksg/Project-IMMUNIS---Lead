@@ -24,6 +24,11 @@ class MemoryStore:
         self._persist()
         return entry
 
+    def search(self, query: str) -> list[MemoryEntry]:
+        """Naive substring search over stored entries."""
+        q = query.lower()
+        return [e for e in self.entries.values() if q in e.text.lower()]
+
     def read(self, entry_id: str) -> MemoryEntry:
         return self.entries[entry_id]
 

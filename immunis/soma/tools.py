@@ -33,14 +33,16 @@ def write_file(path: str, content: str) -> dict:
 
 def memory_search(query: str) -> dict:
     from immunis.soma.memory import MemoryStore
-    return MemoryStore().search(query)
+    results = MemoryStore().search(query)
+    return {"output": json.dumps([e.model_dump() for e in results]),
+            "id": f"search:{query}"}
 
 def memory_write(content: str) -> dict:
     from immunis.soma.memory import MemoryStore
     from immunis.soma.taint import stamp
     from immunis.contracts.models import Trust, Origin
     entry = MemoryStore().write(content, stamp("tool_write", Trust.trusted, Origin.tool))
-    return {"output": f"stored {entry['id']}", "id": entry["id"]}
+    return {"output": f"stored {entry.id}", "id": entry.id}
 
 def send_message(to: str, body: str) -> dict:
     return {"output": f"sent to {to}", "id": f"out_{to}"}

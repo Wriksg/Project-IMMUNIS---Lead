@@ -55,4 +55,4 @@ def test_memory_write_roundtrip(tmp_path, monkeypatch):
     store = MemoryStore("m2.json")
     entry = store.write("hello", stamp("t", Trust.trusted, Origin.user))
     store2 = MemoryStore("m2.json")
-    assert entry["id"] in store2.entries
+    assert entry.id in store2.entries
